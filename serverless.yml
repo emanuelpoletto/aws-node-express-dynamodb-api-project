@@ -1,0 +1,54 @@
+service: ep-poc-sls-service
+
+frameworkVersion: '2'
+
+configValidationMode: error
+
+custom:
+  tableName: ${self:service}-users-table
+  topicName: ${self:service}-users-topic
+  queueName: ${self:service}-users-queue
+
+provider:
+  name: aws
+  runtime: nodejs14.x
+  lambdaHashingVersion: '20201221'
+  stage: dev
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:*
+          Resource:
+            Fn::GetAtt: [ UsersTable, Arn ]
+  environment:
+    USERS_TABLE: ${self:custom.tableName}
+    USERS_TOPIC: arn:aws:sns:us-east-1:123456789012:${self:custom.topicName}
+
+functions:
+  usersApi:
+    handler: src/handler.usersApi
+    events:
+      - http:
+          path: /
+          method: ANY
+      - http:
+          path: /{proxy+}
+          method: ANY
+
+resources:
+  Resources:
+    UsersTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.tableName}
+        AttributeDefinitions:
+          - AttributeName: userId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: userId
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
